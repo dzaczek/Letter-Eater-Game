@@ -18,6 +18,12 @@ class Game {
         // Create audio manager instance
         this.audioManager = new AudioManager();
         
+        // Add gyroscope support properties
+        this.gyroscopeEnabled = false;
+        this.gyroscopeData = { x: 0, y: 0 };
+        this.lastGyroscopeUpdate = 0;
+        this.gyroscopeSensitivity = 0.5; // Adjust this value to control movement sensitivity
+        
         // Start initialization process
         this.startInitialization();
     }
@@ -1659,42 +1665,47 @@ class Game {
     }
 
     updatePlayerMovement() {
-        // Calculate distance from mouse to player center
-        const dx = this.mousePosition.x - this.player.x;
-        const dy = this.mousePosition.y - this.player.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const perimeterRadius = this.calculatePerimeterRadius();
-
-        // Calculate target velocity based on mouse position with reduced speed scaling
-        if (distance > perimeterRadius) {
-            const directionX = dx / distance;
-            const directionY = dy / distance;
-            const distanceFromPerimeter = distance - perimeterRadius;
-            const maxDistance = 100;  // Reduced from 150 to 100 for more precise control
-            const speedFactor = Math.min(distanceFromPerimeter / maxDistance, 1);
-            
-            // Apply a gentler speed scaling
-            const scaledSpeedFactor = Math.pow(speedFactor, 1.2); // Reduced from 1.5 to 1.2 for more linear control
-            
+        // Check if we should use gyroscope control
+        if (this.gyroscopeEnabled && this.lastGyroscopeUpdate > Date.now() - 1000) {
+            // Use gyroscope data for movement
+            const targetSpeed = this.player.speed;
             this.player.targetVelocity = {
-                x: directionX * this.player.speed * scaledSpeedFactor,
-                y: directionY * this.player.speed * scaledSpeedFactor
+                x: this.gyroscopeData.x * targetSpeed,
+                y: this.gyroscopeData.y * targetSpeed
             };
-            this.mousePosition.isInPerimeter = false;
         } else {
-            // Smoother deceleration when inside perimeter
-            this.player.targetVelocity = {
-                x: this.player.velocity.x * 0.98, // Changed from 0.95 to 0.98 for smoother deceleration
-                y: this.player.velocity.y * 0.98
-            };
-            this.mousePosition.isInPerimeter = true;
+            // Original mouse-based movement code
+            const dx = this.mousePosition.x - this.player.x;
+            const dy = this.mousePosition.y - this.player.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const perimeterRadius = this.calculatePerimeterRadius();
+
+            if (distance > perimeterRadius) {
+                const directionX = dx / distance;
+                const directionY = dy / distance;
+                const distanceFromPerimeter = distance - perimeterRadius;
+                const maxDistance = 100;
+                const speedFactor = Math.min(distanceFromPerimeter / maxDistance, 1);
+                const scaledSpeedFactor = Math.pow(speedFactor, 1.2);
+                
+                this.player.targetVelocity = {
+                    x: directionX * this.player.speed * scaledSpeedFactor,
+                    y: directionY * this.player.speed * scaledSpeedFactor
+                };
+                this.mousePosition.isInPerimeter = false;
+            } else {
+                this.player.targetVelocity = {
+                    x: this.player.velocity.x * 0.98,
+                    y: this.player.velocity.y * 0.98
+                };
+                this.mousePosition.isInPerimeter = true;
+            }
         }
 
-        // Smoother velocity adjustments
+        // Common movement code for both control methods
         this.player.velocity.x += (this.player.targetVelocity.x - this.player.velocity.x) * this.physicsConfig.smoothFactor;
         this.player.velocity.y += (this.player.targetVelocity.y - this.player.velocity.y) * this.physicsConfig.smoothFactor;
 
-        // Apply velocity to position
         this.player.x += this.player.velocity.x;
         this.player.y += this.player.velocity.y;
 
@@ -1791,6 +1802,77 @@ class Game {
         gameOverText.onclick = () => {
             gameOverText.remove();
         };
+    }
+
+    initializeGyroscope() {
+        // Check if device has gyroscope
+        if (window.DeviceOrientationEvent) {
+            // Add gyroscope toggle button to UI
+            const gyroButton = document.createElement('button');
+            gyroButton.id = 'gyroToggle';
+            gyroButton.textContent = '🎮 Gyro';
+            gyroButton.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                padding: 10px 20px;
+                background: #3498db;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                z-index: 1000;
+                display: none; // Hidden by default, shown on mobile
+            `;
+            
+            // Show button only on mobile devices
+            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                gyroButton.style.display = 'block';
+            }
+
+            gyroButton.onclick = () => this.toggleGyroscope();
+            document.body.appendChild(gyroButton);
+
+            // Add event listener for device orientation
+            window.addEventListener('deviceorientation', (event) => {
+                if (this.gyroscopeEnabled) {
+                    // Update gyroscope data
+                    this.gyroscopeData = {
+                        x: event.gamma * this.gyroscopeSensitivity, // Left/right tilt
+                        y: event.beta * this.gyroscopeSensitivity   // Forward/backward tilt
+                    };
+                    this.lastGyroscopeUpdate = Date.now();
+                }
+            });
+        }
+    }
+
+    toggleGyroscope() {
+        this.gyroscopeEnabled = !this.gyroscopeEnabled;
+        const button = document.getElementById('gyroToggle');
+        
+        if (this.gyroscopeEnabled) {
+            button.style.background = '#2ecc71';
+            button.textContent = '🎮 Gyro ON';
+            // Request permission for iOS devices
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('deviceorientation', this.handleOrientation);
+                        } else {
+                            this.gyroscopeEnabled = false;
+                            button.style.background = '#3498db';
+                            button.textContent = '🎮 Gyro';
+                            alert('Gyroscope permission denied');
+                        }
+                    })
+                    .catch(console.error);
+            }
+        } else {
+            button.style.background = '#3498db';
+            button.textContent = '🎮 Gyro';
+        }
     }
 }
 
