@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  game:
+    build: .
+    container_name: letter_game
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./public/audio:/app/public/audio
+    environment:
+      - NODE_ENV=development
+    command: npm run dev 

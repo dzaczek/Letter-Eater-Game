@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Letter Eater Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #gameCanvas {
+            background-color: #ffffff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        #score {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 28px;
+            color: #333;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        #powerups {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            font-size: 20px;
+            color: #333;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        #languageSelector {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        #languageSelector select {
+            padding: 5px 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            background-color: white;
+        }
+        .eat-text {
+            position: absolute;
+            font-size: 32px;
+            font-weight: bold;
+            color: #2ecc71;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            pointer-events: none;
+            transition: all 1s;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">Score: 0</div>
+    <div id="powerups">Active Power-ups: None</div>
+   
+    <canvas id="gameCanvas"></canvas>
+    <script src="/js/config.js"></script>
+    <script src="/js/soundManager.js"></script>
+    <script src="/js/audioManager.js"></script>
+    <script src="/js/languageConfig.js"></script>
+    <script src="/js/letterWords.js"></script>
+    <script src="/js/gameConfig.js"></script>
+    <script src="/js/game.js"></script>
+    <script>
+        function changeLanguage(lang) {
+            if (window.languageConfig.setLanguage(lang)) {
+                // Update UI elements with new language
+                document.getElementById('score').textContent = window.languageConfig.getText('score', { score: game.score });
+                document.getElementById('powerups').textContent = window.languageConfig.getText('powerups', { powerups: 'None' });
+                
+                // Update game's audio manager
+                if (game && game.audioManager) {
+                    game.audioManager.setLanguage(lang);
+                }
+                
+                // Update sound manager
+                if (game && game.soundManager) {
+                    game.soundManager.preloadSounds();
+                }
+            }
+        }
+    </script>
+</body>
+</html> 
