@@ -169,95 +169,95 @@ class Game {
     }
 
     async showLanguageSelection() {
-        // Double check that audio manager is initialized
-        if (!this.audioManager || !this.audioManager.isInitialized) {
-            console.error('AudioManager not properly initialized');
+        if (!this.audioManager) {
+            console.error('Audio manager not initialized');
             return;
         }
 
-        const languages = window.languageConfig.getSupportedLanguages();
-        if (!languages) {
-            console.error('No supported languages available');
-            return;
-        }
-        
-        // Create language selection modal
         const modal = document.createElement('div');
         modal.style.cssText = `
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        `;
-
-        const content = document.createElement('div');
-        content.style.cssText = `
-            background: white;
-            padding: 2rem;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
             border-radius: 10px;
+            z-index: 1000;
             text-align: center;
-            max-width: 80%;
-            max-height: 80%;
-            overflow-y: auto;
+            min-width: 300px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
         `;
 
         const title = document.createElement('h2');
         title.textContent = window.languageConfig.getText('selectLanguage');
-        content.appendChild(title);
-
-        const languageGrid = document.createElement('div');
-        languageGrid.style.cssText = `
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1rem;
-            margin: 1rem 0;
+        title.style.cssText = `
+            color: white;
+            margin-bottom: 20px;
+            font-size: 24px;
         `;
+        modal.appendChild(title);
 
-        // Define the order of languages
-        const languageOrder = ['pl', 'en', 'de', 'fr', 'uk', 'es', 'it', 'ru', 'ja', 'zh', 'ko'];
-        
+        // Define language order
+        const languageOrder = [
+            'pl',  // Polish
+            'en',  // English
+            'de',  // German
+            'fr',  // French
+            'uk',  // Ukrainian
+            'hu',  // Hungarian
+            'hi',  // Hindi
+            'es',  // Spanish
+            'it',  // Italian
+            'ru',  // Russian
+            'ja',  // Japanese
+            'zh',  // Chinese
+            'ko'   // Korean
+        ];
+
         // Create buttons in specified order
-        for (const langCode of languageOrder) {
-            const lang = languages[langCode];
-            if (!lang) continue; // Skip if language not found
+        languageOrder.forEach(langCode => {
+            const lang = window.languageConfig.supportedLanguages[langCode];
+            if (lang) {
+                const button = document.createElement('button');
+                button.textContent = lang.name;
+                button.style.cssText = `
+                    display: block;
+                    width: 100%;
+                    padding: 10px;
+                    margin: 5px 0;
+                    background: #4CAF50;
+                    color: white;
+                    border: none;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    transition: background 0.3s;
+                `;
+                button.onmouseover = () => button.style.background = '#45a049';
+                button.onmouseout = () => button.style.background = '#4CAF50';
+                
+                // Store reference to this for use in the async function
+                const game = this;
+                button.onclick = async () => {
+                    try {
+                        // Use audioManager directly
+                        await game.audioManager.setLanguage(langCode);
+                        // Update UI elements with new language
+                        document.getElementById('score').textContent = window.languageConfig.getText('score', { score: game.score });
+                        document.getElementById('powerups').textContent = window.languageConfig.getText('powerups', { powerups: 'None' });
+                        modal.remove();
+                        // Start the game after language selection
+                        await game.startGame();
+                    } catch (error) {
+                        console.error('Failed to set language:', error);
+                        alert('Failed to set language. Please try again.');
+                    }
+                };
+                modal.appendChild(button);
+            }
+        });
 
-            const button = document.createElement('button');
-            button.textContent = lang.name;
-            button.style.cssText = `
-                padding: 0.5rem 1rem;
-                border: none;
-                border-radius: 5px;
-                background: #3498db;
-                color: white;
-                cursor: pointer;
-                transition: background 0.3s;
-            `;
-            button.onmouseover = () => button.style.background = '#2980b9';
-            button.onmouseout = () => button.style.background = '#3498db';
-            
-            button.onclick = async () => {
-                try {
-                    await this.audioManager.setLanguage(langCode);
-                    modal.remove();
-                    // Start game after language selection
-                    await this.startGame();
-                } catch (error) {
-                    console.error('Failed to set language:', error);
-                    alert('Failed to set language. Please try again.');
-                }
-            };
-            
-            languageGrid.appendChild(button);
-        }
-
-        content.appendChild(languageGrid);
-        modal.appendChild(content);
         document.body.appendChild(modal);
     }
 
@@ -1370,12 +1370,8 @@ class Game {
         const active = Array.from(this.activeEffects.entries())
             .filter(([_, endTime]) => endTime > Date.now())
             .map(([type]) => {
-                switch(type) {
-                    case 'speed': return window.languageConfig.getText('powerups.speed');
-                    case 'bulletproof': return window.languageConfig.getText('powerups.bulletproof');
-                    case 'growth': return window.languageConfig.getText('powerups.growth');
-                    default: return type;
-                }
+                const powerupKey = `powerups.${type}`;
+                return window.languageConfig.getText(powerupKey);
             });
         
         document.getElementById('powerups').textContent = 
@@ -1872,6 +1868,19 @@ class Game {
         } else {
             button.style.background = '#3498db';
             button.textContent = '🎮 Gyro';
+        }
+    }
+
+    async setLanguage(langCode) {
+        try {
+            await this.audioManager.setLanguage(langCode);
+            // Update UI elements with new language
+            document.getElementById('score').textContent = window.languageConfig.getText('score', { score: this.score });
+            document.getElementById('powerups').textContent = window.languageConfig.getText('powerups', { powerups: 'None' });
+            return true;
+        } catch (error) {
+            console.error('Failed to set language:', error);
+            return false;
         }
     }
 }
